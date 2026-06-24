@@ -161,6 +161,66 @@ jobs:
         id: lighthouse-assert
         run: npx lhci assert
 
+      - name: Post Lighthouse results summary
+        if: always() && steps.lighthouse-collect.outcome == 'success'
+        run: |
+          RESULTS_FILE=".lighthouseci/assertion-results.json"
+
+          echo '## Lighthouse Results' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          # Parse category scores from LHR file
+          for f in .lighthouseci/lhr-*.json; do
+            PERF=$(jq -r '.categories.performance.score * 100 | floor' "$f")
+            A11Y=$(jq -r '.categories.accessibility.score * 100 | floor' "$f")
+            BP=$(jq -r '.["categories"]["best-practices"].score * 100 | floor' "$f")
+            SEO=$(jq -r '.categories.seo.score * 100 | floor' "$f")
+            FCP=$(jq -r '.audits["first-contentful-paint"].numericValue | round' "$f")
+            TTI=$(jq -r '.audits["interactive"].numericValue | round' "$f")
+            CSS=$(jq -r '.["audits"]["resource-summary"].details.items[] | select(.resourceType=="stylesheet") | .transferSize' "$f")
+            TOTAL=$(jq -r '.["audits"]["resource-summary"].details.items[] | select(.resourceType=="total") | .transferSize' "$f")
+
+            echo "| Category | Score |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| Performance | ${PERF}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Accessibility | ${A11Y}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Best Practices | ${BP}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| SEO | ${SEO}% |" >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| FCP | ${FCP}ms |" >> $GITHUB_STEP_SUMMARY
+            echo "| TTI | ${TTI}ms |" >> $GITHUB_STEP_SUMMARY
+            echo "| CSS transfer | ${CSS}B |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total transfer | ${TOTAL}B |" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          # Parse assertion results
+          FAILED=$(jq '[.[] | select(.passed == false)] | length' "$RESULTS_FILE" 2>/dev/null || echo "0")
+
+          echo "### Budget Assertions" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "**${FAILED} assertion(s) failed**" >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo "| Audit | Expected | Found |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+            jq -r '[.[] | select(.passed == false)] | .[] | "| \(.auditId).\(.auditProperty) | \(.operator) \(.expected) | \(.actual) |"' "$RESULTS_FILE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All budget assertions passed." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Lighthouse reports
+        if: always() && steps.lighthouse-collect.outcome == 'success'
+        uses: actions/upload-artifact@v5
+        with:
+          name: lighthouse-results-pr-${{ github.event.pull_request.number }}
+          path: .lighthouseci/
+          retention-days: 30
+
   # ── JOB 3b: Integration tests against production ─────────────────
   integration-test:
     name: Integration Tests (Production)
