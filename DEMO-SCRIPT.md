@@ -55,10 +55,15 @@ git push origin demo/add-counter-test
 
 - Open a PR on GitHub
 - **Show the checks running** — wait for both to go green ✓✓
+- **Show the PR comment** — the bot posted a preview URL:
+  > *"🚀 Preview deployed! https://<user>.github.io/sample-ci-cd/preview/pr-1/"*
+- Click the preview URL — it's a live, working copy of the PR changes
+- > *"This is staging vs. production. Every PR gets its own live preview. Reviewers don't just read the diff — they click a link and see the change. This is how Vercel, Netlify, and every major platform work. And it's free with GitHub Actions."*
 - *"Both unit and integration tests pass. This change is safe to merge."*
 - Merge the PR
-- **Show the deploy job firing** on master
-- Refresh the live site — still works
+- **Show the deploy job firing** on master (production)
+- **Show the cleanup workflow** — it automatically deletes the preview directory when the PR closes
+- Refresh the production URL — still works, no preview clutter left behind
 
 ---
 
@@ -155,6 +160,7 @@ git push origin feature/double-increment
 
 - Try to merge (or just point out the greyed-out merge button)
 - > *"This is the safety net. Without this automated check, I'd merge this PR, `master` would be broken, and the next person who pulls wouldn't know why their counter jumps by 2. Or worse — I'd deploy a broken page and everyone sees it."*
+- > *"Also notice: there's NO preview comment on this PR. The deploy-preview job only runs if BOTH tests pass. No green tests = no preview URL. You don't get a staging environment until your code is proven safe."*
 
 ### Step B7 — Fix it
 
@@ -179,6 +185,9 @@ git push origin feature/double-increment
 ```
 
 - Both checks go green ✓✓
+- **The bot comments again** — "🚀 Preview updated!" with the live preview URL
+- Click the preview URL → show the counter now increments by 2
+- > *"Now I can actually click through and verify the change works, before merging. This is staging — I test the real thing without touching production."*
 - Merge button is now enabled
 
 ### Step B8 — Merge and show deploy
@@ -186,11 +195,12 @@ git push origin feature/double-increment
 > *"Now everything passes. Let me merge."*
 
 - Merge the PR
-- Show the **deploy job** running on master
-- Refresh the live site
+- Show the **deploy job** running on master (production)
+- Show the **cleanup workflow** — automatically deletes the preview directory
+- Refresh the live production site
 - Click the button — now it increments by 2!
 
-> *"The full loop: branch → change → test → PR → more test → review → merge → deploy. Every commit on master is tested. Every deploy comes from tested code. This is how industry teams ship multiple times a day without breaking things."*
+> *"The full loop: branch → change → test → PR → see it live on staging → review → merge → deploy to production. Every commit on master is tested. Every deploy comes from tested code. And every PR gets its own preview URL so you can click through the change before merging. This is how industry teams ship multiple times a day without breaking things."*
 
 ---
 
@@ -225,6 +235,9 @@ A: You should! But CI catches what you forget to run. Did you update the integra
 
 **Q: What if tests take too long?**
 A: Unit tests should be fast (< 10 seconds). Integration tests can be slower. For research: smoke tests (2 training steps, no crash) are cheap and catch 80% of real bugs.
+
+**Q: Why have both staging and production? Why not just deploy the PR to the main URL?**
+A: Because production should never be "maybe works." Staging (the PR preview) is where you test. Production (master) is what your users see. If staging breaks, nobody cares — it's a preview. If production breaks, everyone notices. Separating them means you never have to choose between "ship fast" and "don't break things."
 
 **Q: Can I skip this and just be careful?**
 A: Everyone thinks they're careful. The best engineers I've worked with still rely on CI. It's not about skill — it's about having a safety net for the moments you're tired, distracted, or in a hurry.

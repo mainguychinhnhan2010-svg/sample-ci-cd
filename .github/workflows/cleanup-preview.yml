@@ -1,0 +1,41 @@
+name: Cleanup PR Preview
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    name: Remove preview directory
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Delete preview directory
+        run: |
+          PREVIEW_DIR="preview/pr-${{ github.event.pull_request.number }}"
+
+          if [ -d "$PREVIEW_DIR" ]; then
+            rm -rf "$PREVIEW_DIR"
+            echo "Removed $PREVIEW_DIR"
+          else
+            echo "No preview directory to remove ($PREVIEW_DIR not found)"
+            exit 0
+          fi
+
+      - name: Commit and push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}"
+            git push
+            echo "Cleanup committed and pushed"
+          else
+            echo "No changes to commit"
+          fi

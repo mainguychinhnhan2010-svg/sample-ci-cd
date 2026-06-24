@@ -45,13 +45,25 @@ npx cypress open
 ## The pipeline
 
 ```
-git push → [unit tests] → [integration tests] → [deploy to GitHub Pages]
-              (Jest)           (Cypress)            (only on master)
+                      ┌─→ [deploy preview]  ──→ /preview/pr-N/  (staging)
+PR opened / push ─→ [unit-test] ─→ [integration-test]
+                      └─→ [deploy]          ──→ /                (production, master only)
 ```
 
-- **Unit tests** run on every push and every PR
-- **Integration tests** run after unit tests pass
-- **Deploy** only fires on push to `master` (after merge), requires both to pass
+- **Unit tests** (Jest) run on every push and every PR
+- **Integration tests** (Cypress) run after unit tests pass
+- **PR preview** deploys to `/preview/pr-<number>/` — a live staging URL you can click
+- **Production deploy** only fires on push to `master` (after merge), deploys to the root
+- **Auto-cleanup:** when a PR is closed or merged, its preview directory is deleted
+
+## Deployment architecture
+
+| Environment | Trigger | URL | Purpose |
+|---|---|---|---|
+| **Production** | Push to `master` | `https://<user>.github.io/sample-ci-cd/` | The live site everyone sees |
+| **Staging (PR preview)** | PR opened / updated | `https://<user>.github.io/sample-ci-cd/preview/pr-<N>/` | Review a change before merging |
+
+This mirrors how real teams work: every PR gets its own live preview. Reviewers can click a link and see the change, not just read the diff. When the PR merges, the preview is cleaned up automatically.
 
 ## Branch protection (set in GitHub UI)
 
