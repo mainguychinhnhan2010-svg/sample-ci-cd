@@ -30,11 +30,35 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-  # ── JOB 2a: Deploy PR preview (staging) ──────────────────────────
+  # ── JOB 2: Secret scanning (gitleaks) ─────────────────────────────
+  # WARNING: By the time this runs, secrets have ALREADY been pushed to
+  # GitHub. This is the LAST LINE OF DEFENSE, not the first.
+  # The PRIMARY defense is the pre-push hook (.husky/pre-push) which
+  # runs gitleaks locally BEFORE the push leaves your machine.
+  # IF THIS JOB FAILS: the secret is on GitHub's servers →
+  #   (1) rotate the credential immediately
+  #   (2) remove it from the commit
+  #   (3) force-push the cleaned history
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # full history so gitleaks can scan all commits
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2.3.9
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── JOB 3a: Deploy PR preview (staging) ──────────────────────────
   deploy-preview:
     name: Deploy PR Preview
     runs-on: ubuntu-latest
-    needs: unit-test
+    needs: [unit-test, secret-scan]
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
@@ -50,11 +74,11 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
 
-  # ── JOB 2b: Deploy to production (master only) ───────────────────
+  # ── JOB 3b: Deploy to production (master only) ───────────────────
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: unit-test
+    needs: [unit-test, secret-scan]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
       - name: Checkout code
@@ -67,7 +91,7 @@ jobs:
           publish_dir: ./src
           keep_files: true
 
-  # ── JOB 3a: Integration tests against PR preview ─────────────────
+  # ── JOB 4a: Integration tests against PR preview ─────────────────
   integration-test-preview:
     name: Integration Tests (Preview)
     runs-on: ubuntu-latest
@@ -128,7 +152,7 @@ jobs:
               });
             }
 
-  # ── JOB 2c: Lighthouse audit against PR preview ──────────────────
+  # ── JOB 4b: Lighthouse audit against PR preview ──────────────────
   lighthouse-preview:
     name: Lighthouse Audit (Preview)
     runs-on: ubuntu-latest
@@ -161,7 +185,76 @@ jobs:
         id: lighthouse-assert
         run: npx lhci assert
 
-  # ── JOB 3b: Integration tests against production ─────────────────
+      - name: Post Lighthouse results summary
+        if: always() && steps.lighthouse-collect.outcome == 'success'
+        run: |
+          RESULTS_FILE=".lighthouseci/assertion-results.json"
+
+          echo '## Lighthouse Results' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          # Parse category scores from LHR file
+          for f in .lighthouseci/lhr-*.json; do
+            [ -f "$f" ] || continue
+            PERF=$(jq -r '.categories.performance.score * 100 | floor' "$f")
+            A11Y=$(jq -r '.categories.accessibility.score * 100 | floor' "$f")
+            BP=$(jq -r '.["categories"]["best-practices"].score * 100 | floor' "$f")
+            SEO=$(jq -r '.categories.seo.score * 100 | floor' "$f")
+            FCP=$(jq -r '.audits["first-contentful-paint"].numericValue | round' "$f")
+            TTI=$(jq -r '.audits["interactive"].numericValue | round' "$f")
+            CSS=$(jq -r '.["audits"]["resource-summary"].details.items[] | select(.resourceType=="stylesheet") | .transferSize' "$f")
+            TOTAL=$(jq -r '.["audits"]["resource-summary"].details.items[] | select(.resourceType=="total") | .transferSize' "$f")
+
+            echo "| Category | Score |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| Performance | ${PERF}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Accessibility | ${A11Y}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Best Practices | ${BP}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| SEO | ${SEO}% |" >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| FCP | ${FCP}ms |" >> $GITHUB_STEP_SUMMARY
+            echo "| TTI | ${TTI}ms |" >> $GITHUB_STEP_SUMMARY
+            echo "| CSS transfer | ${CSS}B |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total transfer | ${TOTAL}B |" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          # Parse assertion results
+          FAILED=$(jq '[.[] | select(.passed == false)] | length' "$RESULTS_FILE" 2>/dev/null || echo "0")
+
+          echo "### Budget Assertions" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "**${FAILED} assertion(s) failed**" >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo "| Audit | Expected | Found |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+            jq -r '[.[] | select(.passed == false)] | .[] | "| \(.auditId).\(.auditProperty) | \(.operator) \(.expected) | \(.actual) |"' "$RESULTS_FILE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All budget assertions passed." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Dump directory listing to help debug artifact upload
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '### Diagnostic: .lighthouseci/ contents' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -laR .lighthouseci/ >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Lighthouse reports
+        if: always() && steps.lighthouse-collect.outcome == 'success'
+        uses: actions/upload-artifact@v5
+        with:
+          name: lighthouse-results-pr-${{ github.event.pull_request.number }}
+          path: .lighthouseci/**
+          include-hidden-files: true
+          retention-days: 30
+
+  # ── JOB 4c: Integration tests against production ─────────────────
   integration-test:
     name: Integration Tests (Production)
     runs-on: ubuntu-latest
