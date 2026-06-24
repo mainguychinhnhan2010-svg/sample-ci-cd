@@ -226,10 +226,8 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: lighthouse-results-pr-${{ github.event.pull_request.number }}
-          path: |
-            .lighthouseci/lhr-*.json
-            .lighthouseci/lhr-*.html
-            .lighthouseci/assertion-results.json
+          path: .lighthouseci/**
+          retention-days: 30
 
   # ── JOB 3b: Integration tests against production ─────────────────
   integration-test:
