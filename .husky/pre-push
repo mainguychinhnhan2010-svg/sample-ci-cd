@@ -1,5 +1,5 @@
 # Run unit tests first — they block the push if broken
-npm test
+npm test || exit 1
 
 # Secret scan (gitleaks) — catches leaked credentials BEFORE they leave your machine
 # This is the PRIMARY defense. The CI secret-scan job is the safety net.
