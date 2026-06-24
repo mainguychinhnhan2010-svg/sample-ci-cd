@@ -56,7 +56,7 @@ jobs:
             --outputDir=./lighthouse-reports
 
       - name: Archive Lighthouse reports
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: lighthouse-reports-${{ github.run_id }}
           path: ./lighthouse-reports/
