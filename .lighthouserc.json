@@ -1,0 +1,45 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 1,
+      "settings": {
+        "preset": "desktop"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": [
+          ["warn",  {"minScore": 0.95}],
+          ["error", {"minScore": 0.90}]
+        ],
+        "categories:accessibility": [
+          ["warn",  {"minScore": 0.98}],
+          ["error", {"minScore": 0.95}]
+        ],
+        "categories:best-practices": [
+          ["warn",  {"minScore": 0.98}],
+          ["error", {"minScore": 0.95}]
+        ],
+        "categories:seo": [
+          ["warn",  {"minScore": 0.95}],
+          ["error", {"minScore": 0.90}]
+        ],
+
+        "first-contentful-paint": [
+          ["warn",  {"maxNumericValue": 1500}],
+          ["error", {"maxNumericValue": 2000}]
+        ],
+        "interactive": [
+          ["warn",  {"maxNumericValue": 2000}],
+          ["error", {"maxNumericValue": 3000}]
+        ],
+
+        "resource-summary:total.size":      ["error", {"maxNumericValue": 100000}],
+        "resource-summary:script.size":     ["error", {"maxNumericValue": 15000}],
+        "resource-summary:stylesheet.size": ["error", {"maxNumericValue": 10000}],
+        "resource-summary:image.size":      ["error", {"maxNumericValue": 50000}],
+        "resource-summary:font.size":       ["error", {"maxNumericValue": 10000}]
+      }
+    }
+  }
+}
