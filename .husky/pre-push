@@ -1,1 +1,27 @@
+# Run unit tests first — they block the push if broken
 npm test
+
+# Secret scan (gitleaks) — catches leaked credentials BEFORE they leave your machine
+# This is the PRIMARY defense. The CI secret-scan job is the safety net.
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "→ Scanning for secrets (gitleaks)..."
+  gitleaks detect --source . --config .gitleaks.toml --verbose --redact
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Gitleaks found secrets in your commits. Push blocked."
+    echo "   Fix with: git commit --amend   or   git rebase -i"
+    echo "   Then push again."
+    echo "   If the secret is real, ROTATE IT IMMEDIATELY — it may already"
+    echo "   be in your local .git history even if the push was blocked."
+    echo ""
+    exit 1
+  fi
+  echo "✓ No secrets found."
+else
+  echo "⚠️  gitleaks not installed — skipping local secret scan."
+  echo "   CI will still catch secrets, but by then the push has already"
+  echo "   reached GitHub. For your own safety, install gitleaks:"
+  echo "     winget install gitleaks    # Windows"
+  echo "     brew install gitleaks       # macOS"
+  echo ""
+fi
