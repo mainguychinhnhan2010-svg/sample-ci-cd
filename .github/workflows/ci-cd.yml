@@ -171,6 +171,7 @@ jobs:
 
           # Parse category scores from LHR file
           for f in .lighthouseci/lhr-*.json; do
+            [ -f "$f" ] || continue
             PERF=$(jq -r '.categories.performance.score * 100 | floor' "$f")
             A11Y=$(jq -r '.categories.accessibility.score * 100 | floor' "$f")
             BP=$(jq -r '.["categories"]["best-practices"].score * 100 | floor' "$f")
@@ -213,12 +214,20 @@ jobs:
             echo "✅ All budget assertions passed." >> $GITHUB_STEP_SUMMARY
           fi
 
+          # Dump directory listing to help debug artifact upload
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '### Diagnostic: .lighthouseci/ contents' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -laR .lighthouseci/ >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
       - name: Upload Lighthouse reports
         if: always() && steps.lighthouse-collect.outcome == 'success'
         uses: actions/upload-artifact@v5
         with:
           name: lighthouse-results-pr-${{ github.event.pull_request.number }}
-          path: .lighthouseci/
+          path: .lighthouseci/**
+          include-hidden-files: true
           retention-days: 30
 
   # ── JOB 3b: Integration tests against production ─────────────────

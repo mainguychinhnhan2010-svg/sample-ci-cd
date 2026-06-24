@@ -16,11 +16,11 @@
         "first-contentful-paint": ["error", {"maxNumericValue": 2000}],
         "interactive":            ["error", {"maxNumericValue": 3000}],
 
-        "resource-summary:total:size":      ["error", {"maxNumericValue": 100000}],
-        "resource-summary:script:size":     ["error", {"maxNumericValue": 15000}],
-        "resource-summary:stylesheet:size": ["error", {"maxNumericValue": 10000}],
-        "resource-summary:image:size":      ["error", {"maxNumericValue": 50000}],
-        "resource-summary:font:size":       ["error", {"maxNumericValue": 10000}]
+        "resource-summary:total:size":      ["error", {"maxNumericValue": 8000}],
+        "resource-summary:script:size":     ["error", {"maxNumericValue": 5000}],
+        "resource-summary:stylesheet:size": ["error", {"maxNumericValue": 5000}],
+        "resource-summary:image:size":      ["error", {"maxNumericValue": 5000}],
+        "resource-summary:font:size":       ["error", {"maxNumericValue": 5000}]
       }
     }
   }
