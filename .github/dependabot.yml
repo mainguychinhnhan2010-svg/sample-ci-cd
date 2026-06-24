@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # npm dependencies — security updates + version bumps
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "03:00"
+      timezone: "Asia/Ho_Chi_Minh"
+    # Group all non-major updates into a single PR to reduce noise
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    # Security updates get their own individual PRs (GitHub's default behavior)
+    # Labels for easy filtering
+    labels:
+      - "dependencies"
+      - "npm"
+    # Keep PRs manageable
+    open-pull-requests-limit: 10
+    # Auto-rebase when other PRs merge
+    rebase-strategy: "auto"
+
+  # GitHub Actions — keep CI/CD workflows up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "09:00"
+      timezone: "America/Chicago"
+    labels:
+      - "dependencies"
+      - "ci-cd"
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
