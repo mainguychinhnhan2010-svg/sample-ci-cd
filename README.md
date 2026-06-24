@@ -45,25 +45,26 @@ npx cypress open
 ## The pipeline
 
 ```
-                      ┌─→ [deploy preview]  ──→ /preview/pr-N/  (staging)
-PR opened / push ─→ [unit-test] ─→ [integration-test]
-                      └─→ [deploy]          ──→ /                (production, master only)
+                       ┌── deploy-preview ──→ integration-test-preview
+PR opened / push ──→ unit-test                 (Cypress against preview URL)
+                       └── deploy ──────────→ integration-test
+                            (master only)       (Cypress against production URL)
 ```
 
 - **Unit tests** (Jest) run on every push and every PR
-- **Integration tests** (Cypress) run after unit tests pass
-- **PR preview** deploys to `/preview/pr-<number>/` — a live staging URL you can click
-- **Production deploy** only fires on push to `master` (after merge), deploys to the root
+- **Deploy** fires after unit tests pass — to `/preview/pr-<N>/` for PRs, to the root `/` for master
+- **Integration tests** (Cypress) run **against the deployed URL**, not a local server — tests the real thing
+- **PR comment** posts the preview URL only after all checks pass
 - **Auto-cleanup:** when a PR is closed or merged, its preview directory is deleted
 
-## Deployment architecture
+### Why test against the deployed URL?
 
-| Environment | Trigger | URL | Purpose |
+Testing against `localhost` tells you the code works on the CI machine. Testing against the deployed GitHub Pages URL tells you the code works **in production**. If the page doesn't load, if the JS doesn't execute, if a path is wrong — Cypress catches it on the real URL, not a local approximation.
+
+| Environment | Trigger | Deploys to | Tested by |
 |---|---|---|---|
-| **Production** | Push to `master` | `https://<user>.github.io/sample-ci-cd/` | The live site everyone sees |
-| **Staging (PR preview)** | PR opened / updated | `https://<user>.github.io/sample-ci-cd/preview/pr-<N>/` | Review a change before merging |
-
-This mirrors how real teams work: every PR gets its own live preview. Reviewers can click a link and see the change, not just read the diff. When the PR merges, the preview is cleaned up automatically.
+| **Staging** | PR opened / pushed | `/preview/pr-<N>/` | `integration-test-preview` |
+| **Production** | Push to `master` | `/` (root) | `integration-test` |
 
 ## Branch protection (set in GitHub UI)
 
@@ -74,7 +75,7 @@ This mirrors how real teams work: every PR gets its own live preview. Reviewers 
    - ✅ Require approvals (1)
    - ✅ Require status checks to pass before merging
    - ✅ Require branches to be up to date before merging
-4. Add status checks: `unit-test`, `integration-test`
+4. Add status checks: `Unit Tests`, `Integration Tests (Preview)`
 
 See [BRANCH-PROTECTION.md](BRANCH-PROTECTION.md) for detailed setup instructions.
 

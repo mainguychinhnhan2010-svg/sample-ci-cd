@@ -30,9 +30,10 @@ Set these rules **before** the workshop demo. These are configured in the GitHub
 
 4. **Add status checks**
    - Search for and select:
-     - `unit-test`
-     - `integration-test`
+     - `Unit Tests`
+     - `Integration Tests (Preview)`
    - These names must exactly match the `name:` fields in `.github/workflows/ci-cd.yml`
+   - Note: `Integration Tests (Preview)` depends on `Deploy PR Preview`, so requiring it implicitly gates deployment too
    - The checks won't appear in the search until the workflow has run at least once — you may need to push first, then come back to add them
 
 5. **Save**

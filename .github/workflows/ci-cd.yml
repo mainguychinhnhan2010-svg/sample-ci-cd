@@ -26,37 +26,11 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-  # ── JOB 2: Integration tests (Cypress) ────────────────────────────
-  integration-test:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: unit-test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Start dev server
-        run: npx serve src -l 8080 &
-
-      - name: Wait for server to be ready
-        run: npx wait-on http://localhost:8080
-
-      - name: Run Cypress integration tests
-        run: npx cypress run
-
-  # ── JOB 3a: Deploy PR preview (staging) ──────────────────────────
+  # ── JOB 2a: Deploy PR preview (staging) ──────────────────────────
   deploy-preview:
     name: Deploy PR Preview
     runs-on: ubuntu-latest
-    needs: [unit-test, integration-test]
+    needs: unit-test
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
@@ -72,39 +46,11 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
 
-      - name: Comment PR with preview URL
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const prNumber = context.issue.number;
-            const url = `https://${owner}.github.io/${repo}/preview/pr-${prNumber}/`;
-
-            // Check if we already commented a preview URL on this PR
-            const { data: comments } = await github.rest.issues.listComments({
-              owner, repo, issue_number: prNumber,
-            });
-            const existing = comments.find(c =>
-              c.user.login === 'github-actions[bot]' && c.body.includes('preview/pr-')
-            );
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner, repo, comment_id: existing.id,
-                body: `🚀 **Preview updated!**\n\n🔗 ${url}\n\n> This is a staging deployment. The production site is at https://${owner}.github.io/${repo}/`,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner, repo, issue_number: prNumber,
-                body: `🚀 **Preview deployed!**\n\n🔗 ${url}\n\n> This is a staging deployment. The production site is at https://${owner}.github.io/${repo}/`,
-              });
-            }
-
-  # ── JOB 3b: Deploy to production (master only) ───────────────────
+  # ── JOB 2b: Deploy to production (master only) ───────────────────
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [unit-test, integration-test]
+    needs: unit-test
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
       - name: Checkout code
@@ -116,3 +62,93 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./src
           keep_files: true
+
+  # ── JOB 3a: Integration tests against PR preview ─────────────────
+  integration-test-preview:
+    name: Integration Tests (Preview)
+    runs-on: ubuntu-latest
+    needs: deploy-preview
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for GitHub Pages to serve preview
+        run: |
+          PREVIEW_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/preview/pr-${{ github.event.pull_request.number }}/"
+          echo "Waiting for $PREVIEW_URL ..."
+          npx wait-on "$PREVIEW_URL" -t 120000
+          echo "PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_ENV
+
+      - name: Run Cypress against preview URL
+        run: npx cypress run
+        env:
+          CYPRESS_BASE_URL: ${{ env.PREVIEW_URL }}
+
+      - name: Comment PR with preview URL (tests passed!)
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.issue.number;
+            const url = `https://${owner}.github.io/${repo}/preview/pr-${prNumber}/`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number: prNumber,
+            });
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' && c.body.includes('preview/pr-')
+            );
+
+            const statusEmoji = '✅';
+            const body = `${statusEmoji} **All checks passed!**\n\n🔗 [Preview deployment](${url})\n🟢 Production: https://${owner}.github.io/${repo}/\n\n> Integration tests ran against this preview URL and passed.`;
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: prNumber,
+                body,
+              });
+            }
+
+  # ── JOB 3b: Integration tests against production ─────────────────
+  integration-test:
+    name: Integration Tests (Production)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for GitHub Pages to serve production
+        run: |
+          PROD_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          echo "Waiting for $PROD_URL ..."
+          npx wait-on "$PROD_URL" -t 120000
+
+      - name: Run Cypress against production URL
+        run: npx cypress run
+        env:
+          CYPRESS_BASE_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"

@@ -34,8 +34,10 @@
 - Walk through: `src/counter.js`, `tests/unit/counter.test.js`, `tests/integration/counter.cy.js`, `.github/workflows/ci-cd.yml`
 - Highlight the workflow file:
   1. `unit-test` job — runs Jest
-  2. `integration-test` job — runs Cypress (needs unit-test first)
-  3. `deploy` job — deploys to GitHub Pages, only on push to master
+  2. `deploy-preview` job — deploys to a preview URL (`/preview/pr-N/`) — unit tests must pass first
+  3. `integration-test-preview` job — runs Cypress **against the deployed preview URL**
+  4. `deploy` + `integration-test` — same thing but for production (master only)
+- > *"Notice the order: we deploy FIRST, then test against the actual deployed URL. Not localhost. We're testing the real thing."*
 
 ### Step A3 — Show a passing PR
 
@@ -54,14 +56,18 @@ git push origin demo/add-counter-test
 ```
 
 - Open a PR on GitHub
-- **Show the checks running** — wait for both to go green ✓✓
-- **Show the PR comment** — the bot posted a preview URL:
-  > *"🚀 Preview deployed! https://<user>.github.io/sample-ci-cd/preview/pr-1/"*
+- **Show the checks running in order:**
+  1. ✓ `unit-test` — green! Unit tests pass.
+  2. ▶ `deploy-preview` — deploys to `preview/pr-1/` on GitHub Pages
+  3. ▶ `integration-test-preview` — runs Cypress **against the live preview URL**
+- > *"See the order? Unit tests pass → deploy the preview → integration tests hit the real deployed URL. We're not testing against localhost — we're testing the actual GitHub Pages deployment. If the page doesn't load, if the JS doesn't execute, Cypress catches it."*
+- **All three jobs go green ✓✓✓**
+- **Show the PR comment** — the bot posted:
+  > *"✅ All checks passed! Preview: https://<user>.github.io/sample-ci-cd/preview/pr-1/"*
 - Click the preview URL — it's a live, working copy of the PR changes
-- > *"This is staging vs. production. Every PR gets its own live preview. Reviewers don't just read the diff — they click a link and see the change. This is how Vercel, Netlify, and every major platform work. And it's free with GitHub Actions."*
-- *"Both unit and integration tests pass. This change is safe to merge."*
+- > *"This is staging vs. production. Every PR gets its own live preview. Reviewers don't just read the diff — they click a link and see the change. And the integration test already verified this preview works. This is how Vercel, Netlify, and every major platform work."*
 - Merge the PR
-- **Show the deploy job firing** on master (production)
+- **Show the deploy + integration-test jobs firing** on master (production)
 - **Show the cleanup workflow** — it automatically deletes the preview directory when the PR closes
 - Refresh the production URL — still works, no preview clutter left behind
 
@@ -139,28 +145,31 @@ git push origin feature/double-increment
 ```
 
 - Open a PR on GitHub
-- **Wait for the checks:**
-  - ✓ `unit-test` — green! "The unit tests pass!"
-  - ✗ `integration-test` — RED! "But the integration test fails!"
+- **Watch the checks in order:**
+  1. ✓ `unit-test` — green! "The unit tests pass!"
+  2. ✓ `deploy-preview` — green! "The preview deployed successfully to `/preview/pr-2/`"
+  3. ✗ `integration-test-preview` — RED! "But the integration test fails against the deployed preview!"
+- > *"The preview IS live. The page exists. Anyone can visit it. But Cypress just told us it's BROKEN. The integration test ran against the real URL and the button doesn't behave as expected."*
 
 ### Step B5 — Explain the failure
 
 > *"Let's click through and see WHY."*
 
 - Click the red X → click "Details" → see the Cypress failure
-- The Cypress test expects the counter to go 0 → 1 → 2 → 3 after three clicks
-- But now it goes 0 → 2 → 4 → 6 because we changed the default increment to 2
-- The integration test catches what the unit test couldn't: **the full system no longer does what the user expects**
+- The Cypress test visited `https://<user>.github.io/sample-ci-cd/preview/pr-2/` — the real deployed page
+- It expected the counter to go 0 → 1 → 2 → 3 after three clicks
+- But the page actually went 0 → 2 → 4 → 6 because we changed the default increment to 2
+- The integration test catches what the unit test couldn't: **the full system, deployed and live, no longer does what the user expects**
 
 > *"This is the key insight: unit tests verify your functions work. Integration tests verify your APP works. They catch different things. You need both."*
 
 ### Step B6 — Show merge is blocked
 
-> *"Because branch protection requires ALL status checks to pass, I cannot merge this PR. The red X on integration-test blocks me."*
+> *"Because branch protection requires ALL status checks to pass, I cannot merge this PR. The red X on integration-test-preview blocks me."*
 
 - Try to merge (or just point out the greyed-out merge button)
-- > *"This is the safety net. Without this automated check, I'd merge this PR, `master` would be broken, and the next person who pulls wouldn't know why their counter jumps by 2. Or worse — I'd deploy a broken page and everyone sees it."*
-- > *"Also notice: there's NO preview comment on this PR. The deploy-preview job only runs if BOTH tests pass. No green tests = no preview URL. You don't get a staging environment until your code is proven safe."*
+- > *"This is the safety net. Without this automated check, I'd merge this PR, `master` would be broken, and the next person who pulls wouldn't know why their counter jumps by 2."*
+- > *"The preview IS deployed — you can visit the URL. But the success comment never posted because the integration test failed. The PR stays blocked. The code never reaches production."*
 
 ### Step B7 — Fix it
 
@@ -184,10 +193,10 @@ git commit -m "fix: update integration test for double increment"
 git push origin feature/double-increment
 ```
 
-- Both checks go green ✓✓
-- **The bot comments again** — "🚀 Preview updated!" with the live preview URL
+- All checks go green ✓✓✓ — unit-test, deploy-preview, AND integration-test-preview
+- **The bot comments** — "✅ All checks passed!" with the live preview URL
 - Click the preview URL → show the counter now increments by 2
-- > *"Now I can actually click through and verify the change works, before merging. This is staging — I test the real thing without touching production."*
+- > *"Now the integration test ran against THIS preview URL and PASSED. I can click through and verify the change works, before merging. The deployed preview was tested by Cypress — I have proof it works."*
 - Merge button is now enabled
 
 ### Step B8 — Merge and show deploy
@@ -195,12 +204,13 @@ git push origin feature/double-increment
 > *"Now everything passes. Let me merge."*
 
 - Merge the PR
-- Show the **deploy job** running on master (production)
+- Show the **deploy + integration-test** jobs firing on master (production)
+- > *"Same flow on master: deploy to the root URL, then Cypress verifies the production page works."*
 - Show the **cleanup workflow** — automatically deletes the preview directory
 - Refresh the live production site
 - Click the button — now it increments by 2!
 
-> *"The full loop: branch → change → test → PR → see it live on staging → review → merge → deploy to production. Every commit on master is tested. Every deploy comes from tested code. And every PR gets its own preview URL so you can click through the change before merging. This is how industry teams ship multiple times a day without breaking things."*
+> *"The full loop: branch → change → unit-test → deploy preview → integration-test against the live preview URL → see it working → review → merge → deploy to production → test production. Every PR gets deployed and tested BEFORE it touches master. This is how industry teams ship multiple times a day without breaking things."*
 
 ---
 
