@@ -32,6 +32,19 @@ npx cypress run
 npx cypress open
 ```
 
+### Pre-push hook
+
+A [Husky](https://typicode.github.io/husky/) pre-push hook runs `npm test` before every push. If unit tests fail, the push is rejected:
+
+```bash
+git push                         # runs npm test first — blocks push if tests fail
+git push --no-verify             # skip the hook (emergency escape hatch)
+```
+
+This catches broken unit tests on your machine, before they even reach CI.
+
+```
+
 ## How it works
 
 | File | Purpose |

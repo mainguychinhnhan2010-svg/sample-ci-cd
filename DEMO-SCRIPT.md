@@ -54,10 +54,11 @@ git add src/counter.js
 git commit -m "Add extra comment to counter.js"
 git push origin demo/add-counter-test
 ```
+- > *"Notice the pre-push hook just ran `npm test` before the push went through. If my tests had failed, git would have rejected the push right here."*
 
 - Open a PR on GitHub
 - **Show the checks running in order:**
-  1. ✓ `unit-test` — green! Unit tests pass.
+  1. ✓ `unit-test` — green! Unit tests pass. "Already ran locally via the hook, but CI runs them too — belt and suspenders."
   2. ▶ `deploy-preview` — deploys to `preview/pr-1/` on GitHub Pages
   3. ▶ `integration-test-preview` — runs Cypress **against the live preview URL**
 - > *"See the order? Unit tests pass → deploy the preview → integration tests hit the real deployed URL. We're not testing against localhost — we're testing the actual GitHub Pages deployment. If the page doesn't load, if the JS doesn't execute, Cypress catches it."*
@@ -89,54 +90,56 @@ git pull origin master
 git checkout -b feature/double-increment
 ```
 
-### Step B2 — Make the change (unit test will pass)
+### Step B2 — Create the branch + pre-push hook demo
+
+> *"Before I make any changes, let me show you the pre-push hook. Every `git push` runs `npm test` locally first. If tests fail, the push is rejected before it leaves your machine."*
+
+- Show the `.husky/pre-push` file:
+  ```
+  npm test
+  ```
+- Do a quick demo of the hook blocking a broken push:
+  ```js
+  // Edit counter.js — temporarily make the function return 0
+  return 0;
+  ```
+  ```bash
+  git add src/counter.js
+  git commit -m "temp: break counter"
+  git push origin feature/double-increment
+  ```
+- **The hook fires, `npm test` fails, push is REJECTED!**
+- > *"Git didn't even let me push. The broken code never left my machine. No CI runner wasted. The hook caught it locally."*
+- Revert the break:
+  ```bash
+  git checkout src/counter.js   # undo the break
+  git reset HEAD~1               # undo the bogus commit (local, not pushed)
+  ```
+- > *"That's the first line of defense. Now let me make a real change that passes unit tests but breaks integration."*
+
+### Step B3 — Make the change (unit tests will pass, integration won't)
 
 **Edit `src/counter.js`:**
-- Change the default `by` parameter from `1` to `2` in the DOM wiring call
+- Change the default `by` parameter from `1` to `2`:
 
-Change this line in the DOM event listener:
 ```js
-count = incrementCounter(count);   // defaults to +1
-```
-To:
-```js
-count = incrementCounter(count);   // we want +2 now!
-```
-
-And update the function's default to `2`:
-```js
-if (by === undefined) {
-  by = 2;  // changed from 1
-}
+// Old:
+if (by === undefined) { by = 1; }
+// New:
+if (by === undefined) { by = 2; }
 ```
 
 **Edit `tests/unit/counter.test.js`:**
-- Update the expected values to match the new default of +2
+- Update expected values to match the +2 default:
 
-Change:
-```js
-test('increments from 0 to 1 (default increment)', () => {
-  expect(incrementCounter(0)).toBe(1);   // old: expects +1
-});
-```
-To:
-```js
-test('increments from 0 to 2 (default increment)', () => {
-  expect(incrementCounter(0)).toBe(2);   // new: expects +2
-});
-```
-
-Do the same for the "5 → 6" test — make it "5 → 7".
-
-### Step B3 — Run unit tests locally (they pass!)
+Change `increments from 0 to 1` → `increments from 0 to 2`, expect `toBe(2)`
+Change `increments from 5 to 6` → `increments from 5 to 7`, expect `toBe(7)`
 
 ```bash
 npm test
 ```
 
-> *"Unit tests pass! The function works correctly in isolation. My logic is sound. Let me push this."*
-
-### Step B4 — Push and watch integration fail
+- All 5 tests pass ✓
 
 ```bash
 git add src/counter.js tests/unit/counter.test.js
@@ -144,6 +147,11 @@ git commit -m "feat: double-increment counter"
 git push origin feature/double-increment
 ```
 
+- **Pre-push hook fires, `npm test` passes, push is ALLOWED!**
+
+### Step B4 — Open PR and watch integration fail
+
+- The code was already pushed from the pre-push hook demo.
 - Open a PR on GitHub
 - **Watch the checks in order:**
   1. ✓ `unit-test` — green! "The unit tests pass!"
@@ -248,6 +256,9 @@ A: Unit tests should be fast (< 10 seconds). Integration tests can be slower. Fo
 
 **Q: Why have both staging and production? Why not just deploy the PR to the main URL?**
 A: Because production should never be "maybe works." Staging (the PR preview) is where you test. Production (master) is what your users see. If staging breaks, nobody cares — it's a preview. If production breaks, everyone notices. Separating them means you never have to choose between "ship fast" and "don't break things."
+
+**Q: What if the pre-push hook is blocking me and I really need to push?**
+A: `git push --no-verify` skips the hook. This is the escape hatch for emergencies. But it should be rare — if you're using it regularly, your tests are either too slow or too flaky. Fix the tests, don't normalize skipping them.
 
 **Q: Can I skip this and just be careful?**
 A: Everyone thinks they're careful. The best engineers I've worked with still rely on CI. It's not about skill — it's about having a safety net for the moments you're tired, distracted, or in a hurry.
