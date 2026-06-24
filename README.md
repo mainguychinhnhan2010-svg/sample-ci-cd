@@ -4,6 +4,8 @@ A dead-simple Click Counter website used to demonstrate CI/CD with GitHub Action
 
 Part of the **Orientation Seminar** workshop for new AI lab students.
 
+🔗 **Production:** [mainguychinhnhan2010-svg.github.io/sample-ci-cd](https://mainguychinhnhan2010-svg.github.io/sample-ci-cd/)
+
 ## What this is
 
 This is a companion demo project that shows:

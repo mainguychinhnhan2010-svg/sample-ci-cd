@@ -114,7 +114,7 @@ jobs:
             );
 
             const statusEmoji = '✅';
-            const body = `${statusEmoji} **All checks passed!**\n\n🔗 [Preview deployment](${url})\n🟢 Production: https://${owner}.github.io/${repo}/\n\n> Integration tests ran against this preview URL and passed.`;
+            const body = `${statusEmoji} **All checks passed!**\n\n🔗 [Preview deployment](${url})\n\n> Integration tests ran against this preview URL and passed.`;
 
             if (existing) {
               await github.rest.issues.updateComment({
