@@ -1,0 +1,230 @@
+# Workshop Demo Script — CI/CD Pipeline
+
+**Time needed:** ~15-20 minutes (Block 2, Parts 2–5 of the workshop)
+
+**Goal:** Show students the full branch → PR → test → merge → deploy loop, including a deliberate integration test failure to demonstrate why automated tests matter.
+
+---
+
+## Setup (do this before the workshop)
+
+- [ ] Repo is public on GitHub
+- [ ] GitHub Pages is enabled: **Settings → Pages → Source: GitHub Actions**
+- [ ] Branch protection is configured for `master` (see [BRANCH-PROTECTION.md](BRANCH-PROTECTION.md))
+- [ ] `master` has the initial commit with all tests passing and site deployed
+- [ ] Open two tabs: the repo on GitHub (Actions tab), and the live site
+
+---
+
+## Part A: The Baseline (~5 min)
+
+**What the audience sees:** A working pipeline. Everything green.
+
+### Step A1 — Show the live site
+
+> *"This is a Click Counter. One button, one number, one function. It's trivial — the point isn't the app. The point is what happens around it."*
+
+- Open the deployed GitHub Pages URL
+- Click the button a few times — demonstrate it works
+
+### Step A2 — Show the repo structure
+
+> *"Here's the code. `counter.js` has one pure function: `incrementCounter()`. The HTML wires it to a button. There's a Jest test and a Cypress test. And there's this `.github/workflows/ci-cd.yml` file — that's where the magic lives."*
+
+- Walk through: `src/counter.js`, `tests/unit/counter.test.js`, `tests/integration/counter.cy.js`, `.github/workflows/ci-cd.yml`
+- Highlight the workflow file:
+  1. `unit-test` job — runs Jest
+  2. `integration-test` job — runs Cypress (needs unit-test first)
+  3. `deploy` job — deploys to GitHub Pages, only on push to master
+
+### Step A3 — Show a passing PR
+
+> *"Watch what happens when I make a change on a branch."*
+
+```bash
+git checkout -b demo/add-counter-test
+```
+
+Add a comment or minor change to `counter.js`, commit, push.
+
+```bash
+git add src/counter.js
+git commit -m "Add extra comment to counter.js"
+git push origin demo/add-counter-test
+```
+
+- Open a PR on GitHub
+- **Show the checks running** — wait for both to go green ✓✓
+- *"Both unit and integration tests pass. This change is safe to merge."*
+- Merge the PR
+- **Show the deploy job firing** on master
+- Refresh the live site — still works
+
+---
+
+## Part B: The Deliberate Failure (~10 min)
+
+**What the audience sees:** A change where unit tests pass but integration tests fail — and why that blocks deployment.
+
+### Step B1 — The setup
+
+> *"Now let me show you what happens when your unit tests are fine but your integration tests catch a real problem. This happens ALL the time in practice."*
+
+> *"I'm going to add a feature: the counter should increment by 2 instead of 1. 'It's twice as good!' Let me update the function and its unit test."*
+
+```bash
+git checkout master
+git pull origin master
+git checkout -b feature/double-increment
+```
+
+### Step B2 — Make the change (unit test will pass)
+
+**Edit `src/counter.js`:**
+- Change the default `by` parameter from `1` to `2` in the DOM wiring call
+
+Change this line in the DOM event listener:
+```js
+count = incrementCounter(count);   // defaults to +1
+```
+To:
+```js
+count = incrementCounter(count);   // we want +2 now!
+```
+
+And update the function's default to `2`:
+```js
+if (by === undefined) {
+  by = 2;  // changed from 1
+}
+```
+
+**Edit `tests/unit/counter.test.js`:**
+- Update the expected values to match the new default of +2
+
+Change:
+```js
+test('increments from 0 to 1 (default increment)', () => {
+  expect(incrementCounter(0)).toBe(1);   // old: expects +1
+});
+```
+To:
+```js
+test('increments from 0 to 2 (default increment)', () => {
+  expect(incrementCounter(0)).toBe(2);   // new: expects +2
+});
+```
+
+Do the same for the "5 → 6" test — make it "5 → 7".
+
+### Step B3 — Run unit tests locally (they pass!)
+
+```bash
+npm test
+```
+
+> *"Unit tests pass! The function works correctly in isolation. My logic is sound. Let me push this."*
+
+### Step B4 — Push and watch integration fail
+
+```bash
+git add src/counter.js tests/unit/counter.test.js
+git commit -m "feat: double-increment counter"
+git push origin feature/double-increment
+```
+
+- Open a PR on GitHub
+- **Wait for the checks:**
+  - ✓ `unit-test` — green! "The unit tests pass!"
+  - ✗ `integration-test` — RED! "But the integration test fails!"
+
+### Step B5 — Explain the failure
+
+> *"Let's click through and see WHY."*
+
+- Click the red X → click "Details" → see the Cypress failure
+- The Cypress test expects the counter to go 0 → 1 → 2 → 3 after three clicks
+- But now it goes 0 → 2 → 4 → 6 because we changed the default increment to 2
+- The integration test catches what the unit test couldn't: **the full system no longer does what the user expects**
+
+> *"This is the key insight: unit tests verify your functions work. Integration tests verify your APP works. They catch different things. You need both."*
+
+### Step B6 — Show merge is blocked
+
+> *"Because branch protection requires ALL status checks to pass, I cannot merge this PR. The red X on integration-test blocks me."*
+
+- Try to merge (or just point out the greyed-out merge button)
+- > *"This is the safety net. Without this automated check, I'd merge this PR, `master` would be broken, and the next person who pulls wouldn't know why their counter jumps by 2. Or worse — I'd deploy a broken page and everyone sees it."*
+
+### Step B7 — Fix it
+
+> *"Now let me fix this properly. I have two options: update the integration test to expect +2 each click, or keep the default at +1 and pass `2` explicitly when I want double increments. Let's update the integration test to match the new behavior."*
+
+**Edit `tests/integration/counter.cy.js`:**
+```js
+cy.get('#increment-btn').click();
+cy.get('#counter-value').should('have.text', '2');  // was '1'
+
+cy.get('#increment-btn').click();
+cy.get('#counter-value').should('have.text', '4');  // was '2'
+
+cy.get('#increment-btn').click();
+cy.get('#counter-value').should('have.text', '6');  // was '3'
+```
+
+```bash
+git add tests/integration/counter.cy.js
+git commit -m "fix: update integration test for double increment"
+git push origin feature/double-increment
+```
+
+- Both checks go green ✓✓
+- Merge button is now enabled
+
+### Step B8 — Merge and show deploy
+
+> *"Now everything passes. Let me merge."*
+
+- Merge the PR
+- Show the **deploy job** running on master
+- Refresh the live site
+- Click the button — now it increments by 2!
+
+> *"The full loop: branch → change → test → PR → more test → review → merge → deploy. Every commit on master is tested. Every deploy comes from tested code. This is how industry teams ship multiple times a day without breaking things."*
+
+---
+
+## Part C: Why This Matters for Research (~3 min)
+
+Bridging back to the audience:
+
+> *"You might be thinking: 'This is a dumb counter app. I train ML models.' Here's the thing:*
+
+> *"Imagine your training script has a `normalize()` function. You change it to handle a new data format. Your unit test passes — `normalize()` returns the right shape. But you didn't update the data loader integration test, and now the loader feeds `normalize()` tensors of the wrong shape. You merge. Two days later, a labmate pulls your code and their experiment crashes after 6 hours of GPU time."*
+
+> *"This is NOT a hypothetical. This is the most common source of lost productivity in research labs. A 5-minute test saves 6 hours of GPU time. A 10-line workflow file saves a week of debugging. CI/CD isn't corporate overhead — it's a force multiplier for anyone who writes code that other people (or future-you) depend on."*
+
+---
+
+## Cleanup (after the demo)
+
+```bash
+# Delete the demo branches if desired
+git branch -d demo/add-counter-test feature/double-increment
+git push origin --delete demo/add-counter-test feature/double-increment
+```
+
+Or keep them — they serve as teaching examples.
+
+---
+
+## Talking Points / FAQ
+
+**Q: Why not just run everything locally?**
+A: You should! But CI catches what you forget to run. Did you update the integration test? Did you run `npm install` after pulling? The CI remembers for you. Your laptop doesn't run the integration suite when you're tired and trying to merge at 11pm.
+
+**Q: What if tests take too long?**
+A: Unit tests should be fast (< 10 seconds). Integration tests can be slower. For research: smoke tests (2 training steps, no crash) are cheap and catch 80% of real bugs.
+
+**Q: Can I skip this and just be careful?**
+A: Everyone thinks they're careful. The best engineers I've worked with still rely on CI. It's not about skill — it's about having a safety net for the moments you're tired, distracted, or in a hurry.

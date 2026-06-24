@@ -1,0 +1,16 @@
+{
+  "name": "sample-ci-cd",
+  "version": "1.0.0",
+  "description": "A simple click-counter demo for teaching CI/CD with GitHub Actions",
+  "private": true,
+  "scripts": {
+    "start": "npx serve src -l 8080",
+    "test": "jest --config jest.config.js",
+    "test:integration": "npx cypress run"
+  },
+  "devDependencies": {
+    "cypress": "^13.15.0",
+    "jest": "^29.7.0",
+    "serve": "^14.2.0"
+  }
+}
