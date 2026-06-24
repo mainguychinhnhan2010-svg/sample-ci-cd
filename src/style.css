@@ -67,6 +67,7 @@ button:active {
 
 .hint code {
   background: #edf2f7;
+  color: #4a5568;
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   font-size: 0.85em;
