@@ -1,12 +1,12 @@
 const { incrementCounter } = require('../../src/counter');
 
 describe('incrementCounter()', () => {
-  test('increments from 0 to 1 (default increment)', () => {
-    expect(incrementCounter(0)).toBe(1);
+  test('increments from 0 to 2 (default increment)', () => {
+    expect(incrementCounter(0)).toBe(2);
   });
 
-  test('increments from 5 to 6 (default increment)', () => {
-    expect(incrementCounter(5)).toBe(6);
+  test('increments from 5 to 7 (default increment)', () => {
+    expect(incrementCounter(5)).toBe(7);
   });
 
   test('increments by a custom amount', () => {

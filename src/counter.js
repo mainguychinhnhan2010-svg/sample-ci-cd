@@ -8,7 +8,7 @@
  */
 function incrementCounter(currentValue, by) {
   if (by === undefined) {
-    by = 1;
+    by = 2;
   }
   return currentValue + by;
 }
