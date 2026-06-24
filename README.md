@@ -45,8 +45,6 @@ git push --no-verify             # skip the hook (emergency escape hatch)
 
 This catches broken unit tests on your machine, before they even reach CI.
 
-```
-
 ## How it works
 
 | File | Purpose |
