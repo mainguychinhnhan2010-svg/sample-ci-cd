@@ -45,14 +45,14 @@ button {
   padding: 0.75rem 2rem;
   border: none;
   border-radius: 8px;
-  background: #3182ce;
+  background: #2b6cb0;
   color: white;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
 }
 
 button:hover {
-  background: #2b6cb0;
+  background: #2563a0;
 }
 
 button:active {
@@ -67,6 +67,7 @@ button:active {
 
 .hint code {
   background: #edf2f7;
+  color: #4a5568;
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   font-size: 0.85em;
