@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ['master']
 
+permissions:
+  contents: write   # needed to push to gh-pages branch
+  pull-requests: write   # needed to comment preview URL on PR
+
 jobs:
   # ── JOB 1: Unit tests (Jest) ──────────────────────────────────────
   unit-test:

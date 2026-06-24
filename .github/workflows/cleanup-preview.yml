@@ -4,6 +4,9 @@ on:
   pull_request:
     types: [closed]
 
+permissions:
+  contents: write   # needed to push to gh-pages branch
+
 jobs:
   cleanup:
     name: Remove preview directory
