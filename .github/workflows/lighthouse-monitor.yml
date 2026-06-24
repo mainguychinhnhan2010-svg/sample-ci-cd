@@ -1,0 +1,63 @@
+name: Lighthouse Monitor (Production)
+
+on:
+  schedule:
+    # Every day at 3:00 AM ICT (UTC+7 → 20:00 UTC the prior day)
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+    # Manual trigger for ad-hoc checks or workshop demos
+    inputs:
+      url:
+        description: 'URL to audit (leave blank for production)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    name: Lighthouse Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine target URL
+        id: url
+        env:
+          URL_INPUT: ${{ github.event.inputs.url }}
+        run: |
+          if [ -n "$URL_INPUT" ]; then
+            echo "LHCI_URL=$URL_INPUT" >> $GITHUB_ENV
+          else
+            echo "LHCI_URL=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_ENV
+          fi
+
+      - name: Collect Lighthouse reports (3 runs → median)
+        run: |
+          npx lhci collect \
+            --url="$LHCI_URL" \
+            --numberOfRuns=3 \
+            --settings.preset=desktop
+
+      - name: Upload HTML reports as artifacts
+        run: |
+          npx lhci upload \
+            --target=filesystem \
+            --outputDir=./lighthouse-reports
+
+      - name: Archive Lighthouse reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: lighthouse-reports-${{ github.run_id }}
+          path: ./lighthouse-reports/
+          retention-days: 90

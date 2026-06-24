@@ -1,0 +1,67 @@
+# Gitleaks secret scanning configuration
+# Detects accidentally committed secrets: API keys, tokens, passwords, etc.
+# https://github.com/gitleaks/gitleaks
+
+title = "sample-ci-cd gitleaks config"
+
+# ── Allowlist: paths and patterns that are NOT secrets ────────────────
+[allowlist]
+  description = "False positives — things that look like secrets but aren't"
+  paths = [
+    # Package-lock.json contains integrity hashes that can trigger false positives
+    '''package-lock\.json''',
+  ]
+
+  # Allow specific hex strings that are known not to be secrets
+  commits = [
+    # Demo commits that mention fake example tokens in markdown/docs
+    # (gitleaks checks commit messages too — this lets us use example keys in docs)
+  ]
+
+# ── Custom rules ─────────────────────────────────────────────────────
+[[rules]]
+  id = "generic-api-key"
+  description = "Catch generic API key patterns (hex/base64 strings that look like keys)"
+  # Matches assignments like: apiKey = "..." or API_KEY=...
+  regex = '''(?i)(api[_-]?key|secret|token|password|auth)\s*[:=]\s*['"][A-Za-z0-9+/=_-]{16,}['"]'''
+  tags = ["api-key", "generic"]
+
+[[rules]]
+  id = "github-pat"
+  description = "GitHub Personal Access Token"
+  # Classic PAT: ghp_...  |  Fine-grained PAT: github_pat_...
+  regex = '''(ghp_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,})'''
+  tags = ["github", "token"]
+
+[[rules]]
+  id = "private-key-header"
+  description = "Private key file header — should never be in source code"
+  regex = '''-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'''
+  tags = ["key", "crypto"]
+
+[[rules]]
+  id = "aws-access-key"
+  description = "AWS Access Key ID"
+  regex = '''(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+  tags = ["aws", "key"]
+
+[[rules]]
+  id = "slack-webhook"
+  description = "Slack incoming webhook URL"
+  regex = '''https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8,}/B[a-zA-Z0-9_]{8,}/[a-zA-Z0-9_]{24,}'''
+  tags = ["slack", "webhook"]
+
+[[rules]]
+  id = "npm-token"
+  description = "NPM access token"
+  regex = '''npm_[A-Za-z0-9]{36,}'''
+  tags = ["npm", "token"]
+
+# ── Extend built-in rules ───────────────────────────────────────────
+# Gitleaks ships with ~100 built-in rules covering:
+#   GitHub tokens, GitLab tokens, AWS keys, GCP keys, Azure keys,
+#   Stripe keys, Slack tokens, JWT tokens, private keys, .env files,
+#   database connection strings, and many more.
+#
+# The custom rules above add patterns not covered by defaults.
+# Run `gitleaks detect --verbose` to see all active rules.
