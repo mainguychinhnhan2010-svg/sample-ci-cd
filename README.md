@@ -12,6 +12,7 @@ This is a companion demo project that shows:
 
 - **Branch protection:** `master` is locked — no direct pushes
 - **Automated testing:** unit tests (Jest) + integration tests (Cypress)
+- **Performance & accessibility budgets:** Lighthouse CI gates every PR
 - **CI/CD pipeline:** push → test → deploy to GitHub Pages
 - **PR workflow:** branch → PR → status checks → review → merge
 
@@ -32,6 +33,9 @@ npm start
 npx cypress run
 # or for the interactive Cypress UI:
 npx cypress open
+
+# Run Lighthouse CI locally (against localhost)
+npm run lhci
 ```
 
 ### Pre-push hook
@@ -54,14 +58,16 @@ This catches broken unit tests on your machine, before they even reach CI.
 | `tests/unit/counter.test.js` | Jest tests for the pure function |
 | `tests/integration/counter.cy.js` | Cypress tests for the full page |
 | `.github/workflows/ci-cd.yml` | The CI/CD pipeline |
+| `.github/workflows/lighthouse-monitor.yml` | Scheduled Lighthouse monitoring against production |
+| `.lighthouserc.json` | Lighthouse performance & accessibility budget config |
 
 ## The pipeline
 
 ```
-                       ┌── deploy-preview ──→ integration-test-preview
-PR opened / push ──→ unit-test                 (Cypress against preview URL)
-                       └── deploy ──────────→ integration-test
-                            (master only)       (Cypress against production URL)
+                                 ┌── integration-test-preview
+PR opened / push ──→ unit-test ──→ deploy-preview ──→ lighthouse-preview
+                                 └── deploy ──────────→ integration-test
+                                      (master only)       (Cypress against production)
 ```
 
 - **Unit tests** (Jest) run on every push and every PR
@@ -79,6 +85,36 @@ Testing against `localhost` tells you the code works on the CI machine. Testing 
 | **Staging** | PR opened / pushed | `/preview/pr-<N>/` | `integration-test-preview` |
 | **Production** | Push to `master` | `/` (root) | `integration-test` |
 
+### Performance & accessibility budgets
+
+**Tests prove correctness. Budgets prove quality.** Unit and integration tests tell you the code works. Lighthouse budgets tell you the page is fast, accessible, and not bloated. Both gates must pass before a PR can merge.
+
+The `lighthouse-preview` job:
+
+- Runs Lighthouse against the deployed preview URL (same pattern as integration tests)
+- Asserts hard numeric budgets defined in [`.lighthouserc.json`](.lighthouserc.json)
+- Fails the PR status check if any budget is exceeded — merge button disappears
+- Posts a step summary with scores and assertion results
+- Uploads the full Lighthouse report as a run artifact
+
+**Budgets enforced:**
+
+| Budget | Limit | Catches |
+|---|---|---|
+| Category scores | ≥ 90–95% | Accessibility regressions, SEO loss |
+| `total:size` | 8 KB | Heavy dependency added |
+| `stylesheet:size` | 5 KB | CSS framework pulled in for no reason |
+| `script:size` | 5 KB | jQuery just for `onclick` |
+| `image:size`, `font:size` | 5 KB | Unoptimized assets |
+| `first-contentful-paint` | 2 sec | Render-blocking resources |
+| `interactive` | 3 sec | Heavy JS blocking TTI |
+
+### Scheduled monitoring
+
+A separate [cron workflow](.github/workflows/lighthouse-monitor.yml) runs Lighthouse against the production URL daily at 3 AM ICT. It collects 3 runs (median) and stores HTML reports as 90-day artifacts. This catches things the PR gate can't: Lighthouse scoring changes, GitHub Pages infrastructure shifts, a browser engine update that makes a formerly-fast CSS property slow.
+
+Also triggerable manually via `workflow_dispatch` — pass a custom URL or leave blank for production.
+
 ## Branch protection (set in GitHub UI)
 
 1. Go to **Settings → Branches → Add branch protection rule**
@@ -88,7 +124,7 @@ Testing against `localhost` tells you the code works on the CI machine. Testing 
    - ✅ Require approvals (1)
    - ✅ Require status checks to pass before merging
    - ✅ Require branches to be up to date before merging
-4. Add status checks: `Unit Tests`, `Integration Tests (Preview)`
+4. Add status checks: `Unit Tests`, `Integration Tests (Preview)`, `Lighthouse Audit (Preview)`
 
 See [BRANCH-PROTECTION.md](BRANCH-PROTECTION.md) for detailed setup instructions.
 
