@@ -52,6 +52,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITLEAKS_CONFIG: .gitleaks.toml
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── JOB 3a: Deploy PR preview (staging) ──────────────────────────
   deploy-preview:
