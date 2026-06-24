@@ -33,17 +33,19 @@ jobs:
 
       - name: Determine target URL
         id: url
+        env:
+          URL_INPUT: ${{ github.event.inputs.url }}
         run: |
-          if [ -n "${{ github.event.inputs.url }}" ]; then
-            echo "AUDIT_URL=${{ github.event.inputs.url }}" >> $GITHUB_ENV
+          if [ -n "$URL_INPUT" ]; then
+            echo "LHCI_URL=$URL_INPUT" >> $GITHUB_ENV
           else
-            echo "AUDIT_URL=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_ENV
+            echo "LHCI_URL=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_ENV
           fi
 
       - name: Collect Lighthouse reports (3 runs → median)
         run: |
           npx lhci collect \
-            --url="$AUDIT_URL" \
+            --url="$LHCI_URL" \
             --numberOfRuns=3 \
             --settings.preset=desktop
 

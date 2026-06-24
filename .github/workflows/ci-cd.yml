@@ -153,9 +153,13 @@ jobs:
           npx wait-on "$PREVIEW_URL" -t 120000
           echo "PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_ENV
 
-      - name: Run Lighthouse with budget assertions
-        id: lighthouse
-        run: npx lhci autorun --collect.url="$PREVIEW_URL"
+      - name: Collect Lighthouse report
+        id: lighthouse-collect
+        run: npx lhci collect --url="$PREVIEW_URL" --settings.preset=desktop
+
+      - name: Assert performance budgets
+        id: lighthouse-assert
+        run: npx lhci assert
 
   # ── JOB 3b: Integration tests against production ─────────────────
   integration-test:
