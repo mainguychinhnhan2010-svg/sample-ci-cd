@@ -49,7 +49,7 @@ jobs:
           fetch-depth: 0   # full history so gitleaks can scan all commits
 
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2.3.9
+        uses: gitleaks/gitleaks-action@v3.0.0
         env:
           GITLEAKS_CONFIG: .gitleaks.toml
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
